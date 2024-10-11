@@ -217,19 +217,36 @@ impl ScalarUDFImpl for GreatestFunction {
         &self.signature
     }
 
-    fn return_type(&self, _args: &[DataType]) -> Result<DataType> {
-        if _args.is_empty() {
+    fn return_type(&self, args: &[DataType]) -> Result<DataType> {
+        if args.is_empty() {
             return Err(DataFusionError::Internal(
                 "greatest function requires at least one argument".to_string(),
             ));
         }
-        Ok(_args[0].clone())
+
+        // ensure all values have the same type
+        let first_type = &args[0];
+        if !args.iter().all(|arg| arg == first_type) {
+            return Err(DataFusionError::Internal(
+                "greatest function requires all arguments to have the same type".to_string(),
+            ));
+        }
+
+        Ok(args[0].clone())
     }
 
     fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
         if args.is_empty() {
             return Err(DataFusionError::Internal(
                 "greatest function requires at least one argument".to_string(),
+            ));
+        }
+
+        // ensure all values have the same type
+        let first_type = &args[0];
+        if !args.iter().all(|arg| arg.data_type() == first_type.data_type()) {
+            return Err(DataFusionError::Internal(
+                "greatest function requires all arguments to have the same type".to_string(),
             ));
         }
 
@@ -277,6 +294,48 @@ mod tests {
     use datafusion::execution::FunctionRegistry;
     use datafusion::logical_expr::{col};
     use super::*;
+
+    #[tokio::test]
+    async fn test_mix_types_greatest_function() -> Result<()> {
+        let ctx = SessionContext::new();
+        if let Err(e) = register_greatest_function(&ctx) {
+            panic!("Failed to register 'greatest' function: {}", e);
+        }
+
+        // Create a schema for our data
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Float32, true),
+            Field::new("b", DataType::Int64, true),
+            Field::new("c", DataType::Utf8, true),
+        ]));
+
+        // Create data
+        let data = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Float32Array::from(vec![Some(f32::NEG_INFINITY), Some(8.0), Some(2.0)])),
+                Arc::new(Int64Array::from(vec![Some(7), Some(6), Some(2)])),
+                Arc::new(StringArray::from(vec![Some("peach"), Some("banana"), Some("apple")]))
+            ],
+        ).expect("Error creating RecordBatch");
+
+        // Create a DataFrame
+        let df = ctx.read_batch(data).expect("Error creating DataFrame");
+
+        // Get the UDF from the context
+        let udf = ctx.udf("greatest").expect("Error getting UDF");
+
+        // Verify that the result is an error
+        let result = df.select(vec![
+            udf.call(vec![col("a"), col("b"), col("c")]).alias("greatest"),
+        ]).unwrap_err();
+
+        assert!(
+            result.to_string().contains("greatest function requires all arguments to have the same type")
+        );
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_greatest_nan_infinity_arr_function() -> Result<()> {
@@ -775,5 +834,23 @@ mod tests {
         } else {
             panic!("Expected Array result, got something else");
         }
+    }
+
+    #[test]
+    fn test_mix_types_greatest_function_direct() {
+        // Create test arguments as Mixed Types
+        let mixed_args = vec![
+            ColumnarValue::Array(Arc::new(Int32Array::from(vec![Some(1), Some(3), Some(2)]))),
+            ColumnarValue::Array(Arc::new(Float32Array::from(vec![Some(2.0), Some(1.0), Some(4.0)]))),
+        ];
+
+        // Initialize the Greatest function
+        let greatest_fn = GreatestFunction::new();
+
+        // Call the invoke method on the greatest function and handle errors
+        let result = greatest_fn.invoke(&mixed_args);
+
+        // Verify that the result is an error
+        assert!(result.is_err(), "greatest function requires all arguments to have the same type");
     }
 }
