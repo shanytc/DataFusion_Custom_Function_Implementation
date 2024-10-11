@@ -268,14 +268,66 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_greatest_int32_function() -> Result<()> {
+    async fn test_greatest_empty_arr_function() -> Result<()> {
         let ctx = SessionContext::new();
         if let Err(e) = register_greatest_function(&ctx) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
-        // Create a dataframe similar to the Spark example
-        // let df = ctx.read_csv("data.csv", CsvReadOptions::new()).await?;
+        // Create a schema for our data
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, true),
+            Field::new("b", DataType::Int32, true),
+            Field::new("c", DataType::Int32, true),
+        ]));
+
+        // Create data
+        let data = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int32Array::from(vec![None, None, None])),
+                Arc::new(Int32Array::from(vec![None, None, None])),
+                Arc::new(Int32Array::from(vec![None, None, None])),
+            ],
+        ).expect("Error creating RecordBatch");
+
+        // Create a DataFrame
+        let df = ctx.read_batch(data).expect("Error creating DataFrame");
+
+        // Get the UDF from the context
+        let udf = ctx.udf("greatest").expect("Error getting UDF");
+
+        // Test greatest function with column references
+        let result = df.select(vec![
+            udf.call(vec![col("a"), col("b"), col("c")]).alias("greatest"),
+        ])?
+            .collect()
+            .await
+            .expect("Error executing query");
+
+        assert_batches_eq!(
+            &[
+                "+----------+",
+                "| greatest |",
+                "+----------+",
+                "| 0        |",
+                "| 0        |",
+                "| 0        |",
+                "+----------+",
+            ],
+            &result
+        );
+
+        Ok(())
+
+    }
+
+    #[tokio::test]
+    async fn test_greatest_int32_function() -> Result<()> {
+        let ctx = SessionContext::new();
+        if let Err(e) = register_greatest_function(&ctx) {
+            panic!("Failed to register 'greatest' function: {}", e);
+        }
 
         // Create a schema for our data
         let schema = Arc::new(Schema::new(vec![
@@ -330,9 +382,6 @@ mod tests {
         if let Err(e) = register_greatest_function(&ctx) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
-
-        // Create a dataframe similar to the Spark example
-        // let df = ctx.read_csv("data.csv", CsvReadOptions::new()).await?;
 
         // Create a schema for our data
         let schema = Arc::new(Schema::new(vec![
