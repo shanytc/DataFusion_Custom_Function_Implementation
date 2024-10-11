@@ -185,7 +185,7 @@ impl GreatestFunction {
                 TypeSignature::Variadic(vec![DataType::Int64]),
                 TypeSignature::Variadic(vec![DataType::Float32]),
                 TypeSignature::Variadic(vec![DataType::Float64]),
-                // Add more types as needed
+                TypeSignature::Variadic(vec![DataType::Utf8]),
             ],
             Volatility::Immutable,
         );
