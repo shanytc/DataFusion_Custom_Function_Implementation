@@ -6,7 +6,7 @@ use datafusion::error::{DataFusionError, Result};
 use datafusion::logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility};
 use datafusion::prelude::{SessionContext};
 
-pub trait Greatest<T> {
+trait Greatest<T> {
     fn greatest_value(args: &[ColumnarValue]) -> Result<Vec<T>>;
 }
 
@@ -173,12 +173,12 @@ impl Greatest<String> for StringArray {
 
 
 #[derive(Debug)]
-pub struct GreatestFunction {
+struct GreatestFunction {
     signature: Signature,
 }
 
 impl GreatestFunction {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let signature = Signature::one_of(
             vec![
                 TypeSignature::Variadic(vec![DataType::Int32]),
@@ -240,7 +240,7 @@ impl ScalarUDFImpl for GreatestFunction {
     }
 }
 
-// register the greatest function inside the datafusion context
+// register the greatest function inside the DataFusion context
 pub fn register_greatest_function(ctx: &SessionContext) -> Result<()> {
     let greatest_fn = ScalarUDF::from(GreatestFunction::new());
     ctx.register_udf(greatest_fn);
