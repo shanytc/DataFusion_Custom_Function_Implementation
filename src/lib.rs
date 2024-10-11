@@ -28,6 +28,7 @@ impl Greatest<i32> for Int32Array {
                     ColumnarValue::Array(arr) => {
                         let int_arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
                         let current_value = if int_arr.is_null(i) { 0 } else { int_arr.value(i) };
+
                         max_value = Some(max_value.map_or(current_value, |max_val| max_val.max(current_value)));
                     }
                     _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
@@ -88,6 +89,12 @@ impl Greatest<f32> for Float32Array {
                     ColumnarValue::Array(arr) => {
                         let float_arr = arr.as_any().downcast_ref::<Float32Array>().unwrap();
                         let current_value = if float_arr.is_null(i) { 0.0 } else { float_arr.value(i) };
+
+                        // If number is of type NaN, skip it
+                        if current_value.is_nan() {
+                            continue;
+                        }
+
                         max_value = Some(max_value.map_or(current_value, |max_val| max_val.max(current_value)));
                     }
                     _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
@@ -118,6 +125,11 @@ impl Greatest<f64> for Float64Array {
                     ColumnarValue::Array(arr) => {
                         let float_arr = arr.as_any().downcast_ref::<Float64Array>().unwrap();
                         let current_value = if float_arr.is_null(i) { 0.0 } else { float_arr.value(i) };
+
+                        // If number is of type NaN, skip it
+                        if current_value.is_nan() {
+                            continue;
+                        }
                         max_value = Some(max_value.map_or(current_value, |max_val| max_val.max(current_value)));
                     }
                     _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
@@ -170,7 +182,6 @@ impl Greatest<String> for StringArray {
         Ok(result)
     }
 }
-
 
 #[derive(Debug)]
 struct GreatestFunction {
@@ -268,6 +279,60 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn test_greatest_nan_infinity_arr_function() -> Result<()> {
+        let ctx = SessionContext::new();
+        if let Err(e) = register_greatest_function(&ctx) {
+            panic!("Failed to register 'greatest' function: {}", e);
+        }
+
+        // Create a schema for our data
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Float32, true),
+            Field::new("b", DataType::Float32, true),
+            Field::new("c", DataType::Float32, true),
+        ]));
+
+        // Create data
+        let data = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Float32Array::from(vec![Some(f32::NEG_INFINITY), None, Some(f32::NEG_INFINITY)])),
+                Arc::new(Float32Array::from(vec![Some(f32::NAN), None, Some(f32::NEG_INFINITY)])),
+                Arc::new(Float32Array::from(vec![None, Some(f32::NAN), Some(f32::INFINITY)])),
+            ],
+        ).expect("Error creating RecordBatch");
+
+        // Create a DataFrame
+        let df = ctx.read_batch(data).expect("Error creating DataFrame");
+
+        // Get the UDF from the context
+        let udf = ctx.udf("greatest").expect("Error getting UDF");
+
+        // Test greatest function with column references
+        let result = df.select(vec![
+            udf.call(vec![col("a"), col("b"), col("c")]).alias("greatest"),
+        ])?
+            .collect()
+            .await
+            .expect("Error executing query");
+
+        assert_batches_eq!(
+            &[
+                "+----------+",
+                "| greatest |",
+                "+----------+",
+                "| 0.0      |",
+                "| 0.0      |",
+                "| inf      |",
+                "+----------+",
+            ],
+            &result
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_greatest_empty_arr_function() -> Result<()> {
         let ctx = SessionContext::new();
         if let Err(e) = register_greatest_function(&ctx) {
@@ -363,7 +428,6 @@ mod tests {
         );
 
         Ok(())
-
     }
 
     #[tokio::test]
