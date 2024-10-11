@@ -1,0 +1,15 @@
+[package]
+name = "datafusion_greatest"
+version = "0.1.0"
+edition = "2021"
+
+# Your crate's description
+description = "This crate contains a greatest function implementation for DataFusion."
+license = "MIT"
+authors = ["Shany Golan <shany@pm.me>"]
+repository = "https://github.com/shanytc/greatest_fusion_impl"
+
+[dependencies]
+arrow = "53.1.0"
+datafusion = "42.0.0"
+tokio = { version = "1.40.0", features = ["full"] }
