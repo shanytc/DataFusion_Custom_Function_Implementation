@@ -6,7 +6,7 @@ use datafusion::prelude::{CsvReadOptions, SessionContext};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = SessionContext::new();
-    if let Err(e) = register_greatest_function(&ctx) {
+    if let Err(e) = register_greatest_function(&ctx, false) {
         panic!("Failed to register 'greatest' function: {}", e);
     }
 

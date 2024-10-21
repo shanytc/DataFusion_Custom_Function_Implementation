@@ -12,4 +12,5 @@ repository = "https://github.com/shanytc/greatest_fusion_impl"
 [dependencies]
 arrow = "53.1.0"
 datafusion = "42.0.0"
+rayon = "1.10.0"
 tokio = { version = "1.40.0", features = ["full"] }
