@@ -5,9 +5,11 @@ use arrow::datatypes::DataType;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility};
 use datafusion::prelude::{SessionContext};
+use rayon::prelude::*;
 
 trait Greatest<T> {
     fn greatest_value(args: &[ColumnarValue]) -> Result<Vec<T>>;
+    fn greatest_value_par(args: &[ColumnarValue]) -> Result<Vec<T>>;
 }
 
 impl Greatest<i32> for Int32Array {
@@ -20,12 +22,14 @@ impl Greatest<i32> for Int32Array {
             _ => return Err(DataFusionError::Internal("Invalid argument type".to_string())),
         };
 
+        // this iterate
         for i in 0..num_rows {
             let mut max_value: Option<i32> = None;
 
             for arg in args {
                 match arg {
                     ColumnarValue::Array(arr) => {
+                        // convert ColumnarValue slice into array
                         let int_arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
                         let current_value = if int_arr.is_null(i) { 0 } else { int_arr.value(i) };
 
@@ -38,6 +42,35 @@ impl Greatest<i32> for Int32Array {
         }
 
         Ok(result)
+    }
+
+    fn greatest_value_par(args: &[ColumnarValue]) -> Result<Vec<i32>> {
+        // Get the number of rows to process by checking the length of the first array
+        let num_rows = match &args[0] {
+            ColumnarValue::Array(arr) => arr.len(),
+            _ => return Err(DataFusionError::Internal("Invalid argument type".to_string())),
+        };
+
+        // this iterate
+        let result: Result<Vec<i32>, DataFusionError> = (0..num_rows).into_par_iter().map(|i| {
+            let mut max_value: Option<i32> = None;
+
+            for arg in args {
+                match arg {
+                    ColumnarValue::Array(arr) => {
+                        // convert ColumnarValue slice into array
+                        let int_arr = arr.as_any().downcast_ref::<Int32Array>().unwrap();
+                        let current_value = if int_arr.is_null(i) { 0 } else { int_arr.value(i) };
+
+                        max_value = Some(max_value.map_or(current_value, |max_val| max_val.max(current_value)));
+                    }
+                    _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
+                }
+            }
+            Ok(max_value.unwrap_or_default())
+        }).collect();
+
+        result
     }
 }
 
@@ -68,6 +101,34 @@ impl Greatest<i64> for Int64Array {
         }
 
         Ok(result)
+    }
+
+    fn greatest_value_par(args: &[ColumnarValue]) -> Result<Vec<i64>> {
+        // Get the number of rows to process by checking the length of the first array
+        let num_rows = match &args[0] {
+            ColumnarValue::Array(arr) => arr.len(),
+            _ => return Err(DataFusionError::Internal("Invalid argument type".to_string())),
+        };
+
+        let result: Result<Vec<i64>, DataFusionError> = (0..num_rows).into_par_iter().map(|i| {
+            let mut max_value: Option<i64> = None;
+
+            for arg in args {
+                match arg {
+                    ColumnarValue::Array(arr) => {
+                        let int_arr = arr.as_any().downcast_ref::<Int64Array>().unwrap();
+                        let current_value = if int_arr.is_null(i) { 0 } else { int_arr.value(i) };
+
+                        max_value = Some(max_value.map_or(current_value, |max_val| max_val.max(current_value)));
+                    }
+                    _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
+                }
+            }
+
+            Ok(max_value.unwrap_or_default())
+        }).collect();
+
+        result
     }
 }
 
@@ -105,6 +166,39 @@ impl Greatest<f32> for Float32Array {
 
         Ok(result)
     }
+
+    fn greatest_value_par(args: &[ColumnarValue]) -> Result<Vec<f32>> {
+        // Get the number of rows to process by checking the length of the first array
+        let num_rows = match &args[0] {
+            ColumnarValue::Array(arr) => arr.len(),
+            _ => return Err(DataFusionError::Internal("Invalid argument type".to_string())),
+        };
+
+        let result: Result<Vec<f32>, DataFusionError> = (0..num_rows).into_par_iter().map(|i| {
+            let mut max_value: Option<f32> = None;
+
+            for arg in args {
+                match arg {
+                    ColumnarValue::Array(arr) => {
+                        let float_arr = arr.as_any().downcast_ref::<Float32Array>().unwrap();
+                        let current_value = if float_arr.is_null(i) { 0.0 } else { float_arr.value(i) };
+
+                        // If number is of type NaN, skip it
+                        if current_value.is_nan() {
+                            continue;
+                        }
+
+                        max_value = Some(max_value.map_or(current_value, |max_val| max_val.max(current_value)));
+                    }
+                    _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
+                }
+            }
+
+            Ok(max_value.unwrap_or_default())
+        }).collect();
+
+        result
+    }
 }
 
 impl Greatest<f64> for Float64Array {
@@ -139,6 +233,39 @@ impl Greatest<f64> for Float64Array {
         }
 
         Ok(result)
+    }
+
+    fn greatest_value_par(args: &[ColumnarValue]) -> Result<Vec<f64>> {
+        // Get the number of rows to process by checking the length of the first array
+        let num_rows = match &args[0] {
+            ColumnarValue::Array(arr) => arr.len(),
+            _ => return Err(DataFusionError::Internal("Invalid argument type".to_string())),
+        };
+
+        let result: Result<Vec<f64>, DataFusionError> = (0..num_rows).into_par_iter().map(|i| {
+            let mut max_value: Option<f64> = None;
+
+            for arg in args {
+                match arg {
+                    ColumnarValue::Array(arr) => {
+                        let float_arr = arr.as_any().downcast_ref::<Float64Array>().unwrap();
+                        let current_value = if float_arr.is_null(i) { 0.0 } else { float_arr.value(i) };
+
+                        // If number is of type NaN, skip it
+                        if current_value.is_nan() {
+                            continue;
+                        }
+
+                        max_value = Some(max_value.map_or(current_value, |max_val| max_val.max(current_value)));
+                    }
+                    _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
+                }
+            }
+
+            Ok(max_value.unwrap_or_default())
+        }).collect();
+
+        result
     }
 }
 
@@ -180,6 +307,44 @@ impl Greatest<String> for StringArray {
         }
 
         Ok(result)
+    }
+
+    fn greatest_value_par(args: &[ColumnarValue]) -> Result<Vec<String>> {
+        // Get the number of rows to process by checking the length of the first array
+        let num_rows = match &args[0] {
+            ColumnarValue::Array(arr) => arr.len(),
+            _ => return Err(DataFusionError::Internal("Invalid argument type".to_string())),
+        };
+
+        let result: Result<Vec<String>, DataFusionError> = (0..num_rows).into_par_iter().map(|i| {
+            let mut max_value: Option<String> = None;
+
+            for arg in args {
+                match arg {
+                    ColumnarValue::Array(arr) => {
+                        let string_arr = arr.as_any().downcast_ref::<StringArray>().unwrap();
+                        let current_value = if string_arr.is_null(i) {
+                            "".to_string() // Treat null as an empty string
+                        } else {
+                            string_arr.value(i).to_string() // Get the string value
+                        };
+
+                        max_value = Some(max_value.map_or(current_value.clone(), |max_val| {
+                            if max_val >= current_value {
+                                max_val
+                            } else {
+                                current_value.clone()
+                            }
+                        }));
+                    }
+                    _ => return Err(DataFusionError::Internal("Unexpected argument type".to_string())),
+                }
+            }
+
+            Ok(max_value.unwrap_or_default())
+        }).collect();
+
+        result
     }
 }
 
@@ -282,6 +447,17 @@ where
     T: Default,
 {
     let result = A::greatest_value(args)?;
+    let array_ref = Arc::new(A::from(result));
+    Ok(ColumnarValue::Array(array_ref))
+}
+
+// generic function to calculate the greatest value for a given type
+fn greatest_value_gen_par<T, A>(args: &[ColumnarValue]) -> Result<ColumnarValue>
+where
+    A: Greatest<T> + 'static + Array + From<Vec<T>>,
+    T: Default,
+{
+    let result = A::greatest_value_par(args)?;
     let array_ref = Arc::new(A::from(result));
     Ok(ColumnarValue::Array(array_ref))
 }
