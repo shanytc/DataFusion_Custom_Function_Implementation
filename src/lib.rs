@@ -351,10 +351,11 @@ impl Greatest<String> for StringArray {
 #[derive(Debug)]
 struct GreatestFunction {
     signature: Signature,
+    use_parallel: bool
 }
 
 impl GreatestFunction {
-    fn new() -> Self {
+    fn new(use_parallel: bool) -> Self {
         let signature = Signature::one_of(
             vec![
                 TypeSignature::Variadic(vec![DataType::Int32]),
@@ -365,7 +366,8 @@ impl GreatestFunction {
             ],
             Volatility::Immutable,
         );
-        Self { signature }
+        let use_parallel = use_parallel;
+        Self { use_parallel, signature }
     }
 }
 
@@ -417,7 +419,11 @@ impl ScalarUDFImpl for GreatestFunction {
 
         match &args[0] {
             ColumnarValue::Array(arr) => match arr.data_type() {
-                DataType::Int32 => greatest_value_gen::<i32, Int32Array>(args),
+                DataType::Int32 =>
+                    match self.use_parallel {
+                        true => greatest_value_gen_par::<i32, Int32Array>(args),
+                        _ => greatest_value_gen::<i32, Int32Array>(args),
+                    },
                 DataType::Int64 => greatest_value_gen::<i64, Int64Array>(args),
                 DataType::Float32 => greatest_value_gen::<f32, Float32Array>(args),
                 DataType::Float64 => greatest_value_gen::<f64, Float64Array>(args),
@@ -434,8 +440,8 @@ impl ScalarUDFImpl for GreatestFunction {
 }
 
 // register the greatest function inside the DataFusion context
-pub fn register_greatest_function(ctx: &SessionContext) -> Result<()> {
-    let greatest_fn = ScalarUDF::from(GreatestFunction::new());
+pub fn register_greatest_function(ctx: &SessionContext, use_parallel: bool) -> Result<()> {
+    let greatest_fn = ScalarUDF::from(GreatestFunction::new(use_parallel));
     ctx.register_udf(greatest_fn);
     Ok(())
 }
@@ -474,7 +480,7 @@ mod tests {
     #[tokio::test]
     async fn test_mix_types_greatest_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -516,7 +522,7 @@ mod tests {
     #[tokio::test]
     async fn test_greatest_nan_infinity_arr_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -570,7 +576,7 @@ mod tests {
     #[tokio::test]
     async fn test_greatest_empty_arr_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -614,7 +620,7 @@ mod tests {
     #[tokio::test]
     async fn test_greatest_none_arr_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -668,7 +674,7 @@ mod tests {
     #[tokio::test]
     async fn test_greatest_int32_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -722,7 +728,7 @@ mod tests {
     #[tokio::test]
     async fn test_greatest_int64_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -777,7 +783,7 @@ mod tests {
     #[tokio::test]
     async fn test_greatest_float32_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -831,7 +837,7 @@ mod tests {
     #[tokio::test]
     async fn test_greatest_float64_function() -> Result<()> {
         let ctx = SessionContext::new();
-        if let Err(e) = register_greatest_function(&ctx) {
+        if let Err(e) = register_greatest_function(&ctx, false) {
             panic!("Failed to register 'greatest' function: {}", e);
         }
 
@@ -891,7 +897,7 @@ mod tests {
         ];
 
         // Initialize the Greatest function
-        let greatest_fn = GreatestFunction::new();
+        let greatest_fn = GreatestFunction::new(false);
 
         // Call the invoke method on the greatest function and handle errors
         let result = greatest_fn.invoke(&int32_args).expect("Failed to invoke greatest function");
@@ -917,7 +923,7 @@ mod tests {
         ];
 
         // Initialize the Greatest function
-        let greatest_fn = GreatestFunction::new();
+        let greatest_fn = GreatestFunction::new(false);
 
         // Call the invoke method on the greatest function and handle errors
         let result = greatest_fn.invoke(&int64_args).expect("Failed to invoke greatest function");
@@ -943,7 +949,7 @@ mod tests {
         ];
 
         // Initialize the Greatest function
-        let greatest_fn = GreatestFunction::new();
+        let greatest_fn = GreatestFunction::new(false);
 
         // Call the invoke method on the greatest function and handle errors
         let result = greatest_fn.invoke(&float32_args).expect("Failed to invoke greatest function");
@@ -969,7 +975,7 @@ mod tests {
         ];
 
         // Initialize the Greatest function
-        let greatest_fn = GreatestFunction::new();
+        let greatest_fn = GreatestFunction::new(false);
 
         // Call the invoke method on the greatest function and handle errors
         let result = greatest_fn.invoke(&float64_args).expect("Failed to invoke greatest function");
@@ -995,7 +1001,7 @@ mod tests {
         ];
 
         // Initialize the Greatest function
-        let greatest_fn = GreatestFunction::new();
+        let greatest_fn = GreatestFunction::new(false);
 
         // Call the invoke method on the greatest function and handle errors
         let result = greatest_fn.invoke(&string_args).expect("Failed to invoke greatest function");
@@ -1021,7 +1027,7 @@ mod tests {
         ];
 
         // Initialize the Greatest function
-        let greatest_fn = GreatestFunction::new();
+        let greatest_fn = GreatestFunction::new(false);
 
         // Call the invoke method on the greatest function and handle errors
         let result = greatest_fn.invoke(&mixed_args);
