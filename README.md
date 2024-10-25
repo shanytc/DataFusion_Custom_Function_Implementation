@@ -1,7 +1,7 @@
 ### Custom DataFusion Function Implementation
 
 This is a custom function implementation for DataFusion in rust.
-This library implements the 'Greatest' function as is used by the [pyspark.sql.functions.greatest](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.greatest.html) library as an example.
+This library implements the `Greatest` function as is used by the [pyspark.sql.functions.greatest](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.greatest.html) library as an example.
 
 The code contains the library implementation, tests for the library and the binary to load csv file and use the library's registration hook.
 
