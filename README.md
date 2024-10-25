@@ -6,7 +6,7 @@ This library implements the 'Greatest' function as is used by the [pyspark.sql.f
 The code contains the library implementation, tests for the library and the binary to load csv file and use the library's registration hook.
 
 ### ColumnVar:
-The library works with Columnvar Types:
+The library works with ColumnVar Types:
 
 If the Columnvar array is defined with `vec![9.0, 5.0, 9.0]`, this means:
 
