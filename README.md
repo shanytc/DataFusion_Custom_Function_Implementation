@@ -5,6 +5,16 @@ This library implements the 'Greatest' function as is used by the [pyspark.sql.f
 
 The code contains the library implementation, tests for the library and the binary to load csv file and use the library's registration hook.
 
+### Session Registration
+In order to add our custom function to DataFusion, we shall first create a session and than register our custom function with that context.
+
+```rust
+let ctx = SessionContext::new();
+if let Err(e) = register_greatest_function(&ctx, false) {
+    panic!("Failed to register 'greatest' function: {}", e);
+}
+```
+
 ### ColumnVar:
 The library works with ColumnVar Types:
 
