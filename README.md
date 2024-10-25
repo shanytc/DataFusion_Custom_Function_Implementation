@@ -22,6 +22,17 @@ After registering function, we can get an handle to it using the context's udf()
 let udf = ctx.udf("greatest").expect("Error getting UDF");
 ```
 
+### Schemas
+Sometimes it's easier to work with schemas when we create out data-frame.
+```rust
+ // Create a schema for our data
+let schema = Arc::new(Schema::new(vec![
+    Field::new("a", DataType::Int32, true),
+    Field::new("b", DataType::Int32, true),
+    Field::new("c", DataType::Int32, true),
+]));
+```
+
 ### ColumnVar:
 The library works with ColumnVar Types:
 
@@ -36,7 +47,7 @@ If the Columnvar array is defined with `vec![9.0, 5.0, 9.0]`, this means:
 ]
 ```
 
-### Float32Array Example:
+### Float32Array Example with Schema attached:
 ```rust
  let data = RecordBatch::try_new(
     schema.clone(),
