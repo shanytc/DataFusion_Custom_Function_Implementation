@@ -15,6 +15,13 @@ if let Err(e) = register_greatest_function(&ctx, false) {
 }
 ```
 
+### UDF (User Defined Function)
+After registering function, we can get an handle to it using the context's udf() function.
+```rust
+// Get the UDF from the context
+let udf = ctx.udf("greatest").expect("Error getting UDF");
+```
+
 ### ColumnVar:
 The library works with ColumnVar Types:
 
